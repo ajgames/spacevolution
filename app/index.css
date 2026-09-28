@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --animate-fade-out: fade-out 3s ease-in forwards;
+
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+}

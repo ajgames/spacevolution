@@ -1,0 +1,259 @@
+{
+  "encoding": "8-bit sRGB PNG of Cycles diffuse light (direct + indirect) x scale (per room/state)",
+  "resolution": 1024,
+  "samples": 256,
+  "denoised": true,
+  "three_js": {
+    "uv": "TEXCOORD_1 -> geometry.attributes.uv1 (texture.channel = 1)",
+    "texture": {
+      "flipY": false,
+      "colorSpace": "SRGBColorSpace",
+      "channel": 1
+    },
+    "material": "lightMapIntensity = rooms[room].lightmaps[state].lightMapIntensity (= Math.PI / scale)"
+  },
+  "rooms": {
+    "ROOM_command": {
+      "glb": "ROOM_command.glb",
+      "lightmaps": {
+        "normal": {
+          "file": "lightmaps/LM_ROOM_command_normal.png",
+          "scale": 0.253295,
+          "lightMapIntensity": 12.402877
+        },
+        "emergency": {
+          "file": "lightmaps/LM_ROOM_command_emergency.png",
+          "scale": 3.606343,
+          "lightMapIntensity": 0.87113
+        },
+        "blackout": {
+          "file": "lightmaps/LM_ROOM_command_blackout.png",
+          "scale": 7.180001,
+          "lightMapIntensity": 0.437548
+        }
+      }
+    },
+    "ROOM_cryo": {
+      "glb": "ROOM_cryo.glb",
+      "lightmaps": {
+        "normal": {
+          "file": "lightmaps/LM_ROOM_cryo_normal.png",
+          "scale": 0.558427,
+          "lightMapIntensity": 5.625787
+        },
+        "emergency": {
+          "file": "lightmaps/LM_ROOM_cryo_emergency.png",
+          "scale": 3.758555,
+          "lightMapIntensity": 0.835851
+        },
+        "blackout": {
+          "file": "lightmaps/LM_ROOM_cryo_blackout.png",
+          "scale": 3.053709,
+          "lightMapIntensity": 1.028779
+        }
+      }
+    },
+    "ROOM_engineering": {
+      "glb": "ROOM_engineering.glb",
+      "lightmaps": {
+        "normal": {
+          "file": "lightmaps/LM_ROOM_engineering_normal.png",
+          "scale": 0.185044,
+          "lightMapIntensity": 16.977522
+        },
+        "emergency": {
+          "file": "lightmaps/LM_ROOM_engineering_emergency.png",
+          "scale": 4.790714,
+          "lightMapIntensity": 0.655767
+        },
+        "blackout": {
+          "file": "lightmaps/LM_ROOM_engineering_blackout.png",
+          "scale": 19.493336,
+          "lightMapIntensity": 0.161162
+        }
+      }
+    },
+    "ROOM_corridor": {
+      "glb": "ROOM_corridor.glb",
+      "lightmaps": {
+        "normal": {
+          "file": "lightmaps/LM_ROOM_corridor_normal.png",
+          "scale": 0.570376,
+          "lightMapIntensity": 5.50793
+        },
+        "emergency": {
+          "file": "lightmaps/LM_ROOM_corridor_emergency.png",
+          "scale": 2.980327,
+          "lightMapIntensity": 1.05411
+        },
+        "blackout": {
+          "file": "lightmaps/LM_ROOM_corridor_blackout.png",
+          "scale": 28.231197,
+          "lightMapIntensity": 0.111281
+        }
+      }
+    }
+  },
+  "last_bake": {
+    "device": "METAL",
+    "seconds": 596.5,
+    "entries": [
+      {
+        "room": "ROOM_command",
+        "state": "normal",
+        "file": "lightmaps/LM_ROOM_command_normal.png",
+        "scale": 0.253295,
+        "lightMapIntensity": 12.402877,
+        "bake_seconds": 57.5,
+        "stats": {
+          "p50": 0.06863,
+          "p_scale": 3.55316,
+          "max": 6.73347
+        }
+      },
+      {
+        "room": "ROOM_cryo",
+        "state": "normal",
+        "file": "lightmaps/LM_ROOM_cryo_normal.png",
+        "scale": 0.558427,
+        "lightMapIntensity": 5.625787,
+        "bake_seconds": 64.4,
+        "stats": {
+          "p50": 0.01758,
+          "p_scale": 1.61167,
+          "max": 5.2474
+        }
+      },
+      {
+        "room": "ROOM_engineering",
+        "state": "normal",
+        "file": "lightmaps/LM_ROOM_engineering_normal.png",
+        "scale": 0.185044,
+        "lightMapIntensity": 16.977522,
+        "bake_seconds": 52.4,
+        "stats": {
+          "p50": 0.04364,
+          "p_scale": 4.8637,
+          "max": 39.11416
+        }
+      },
+      {
+        "room": "ROOM_corridor",
+        "state": "normal",
+        "file": "lightmaps/LM_ROOM_corridor_normal.png",
+        "scale": 0.570376,
+        "lightMapIntensity": 5.50793,
+        "bake_seconds": 44.5,
+        "stats": {
+          "p50": 0.15806,
+          "p_scale": 1.57791,
+          "max": 5.266
+        }
+      },
+      {
+        "room": "ROOM_command",
+        "state": "emergency",
+        "file": "lightmaps/LM_ROOM_command_emergency.png",
+        "scale": 3.606343,
+        "lightMapIntensity": 0.87113,
+        "bake_seconds": 50.8,
+        "stats": {
+          "p50": 0.00148,
+          "p_scale": 0.24956,
+          "max": 29.45715
+        }
+      },
+      {
+        "room": "ROOM_cryo",
+        "state": "emergency",
+        "file": "lightmaps/LM_ROOM_cryo_emergency.png",
+        "scale": 3.758555,
+        "lightMapIntensity": 0.835851,
+        "bake_seconds": 57.9,
+        "stats": {
+          "p50": 0.00124,
+          "p_scale": 0.23945,
+          "max": 18.77335
+        }
+      },
+      {
+        "room": "ROOM_engineering",
+        "state": "emergency",
+        "file": "lightmaps/LM_ROOM_engineering_emergency.png",
+        "scale": 4.790714,
+        "lightMapIntensity": 0.655767,
+        "bake_seconds": 46.4,
+        "stats": {
+          "p50": 0.00133,
+          "p_scale": 0.18786,
+          "max": 29.18055
+        }
+      },
+      {
+        "room": "ROOM_corridor",
+        "state": "emergency",
+        "file": "lightmaps/LM_ROOM_corridor_emergency.png",
+        "scale": 2.980327,
+        "lightMapIntensity": 1.05411,
+        "bake_seconds": 34.6,
+        "stats": {
+          "p50": 0.00197,
+          "p_scale": 0.30198,
+          "max": 16.68987
+        }
+      },
+      {
+        "room": "ROOM_command",
+        "state": "blackout",
+        "file": "lightmaps/LM_ROOM_command_blackout.png",
+        "scale": 7.180001,
+        "lightMapIntensity": 0.437548,
+        "bake_seconds": 47.8,
+        "stats": {
+          "p50": 0.00301,
+          "p_scale": 0.12535,
+          "max": 2.08149
+        }
+      },
+      {
+        "room": "ROOM_cryo",
+        "state": "blackout",
+        "file": "lightmaps/LM_ROOM_cryo_blackout.png",
+        "scale": 3.053709,
+        "lightMapIntensity": 1.028779,
+        "bake_seconds": 55.1,
+        "stats": {
+          "p50": 0.00254,
+          "p_scale": 0.29472,
+          "max": 1.92808
+        }
+      },
+      {
+        "room": "ROOM_engineering",
+        "state": "blackout",
+        "file": "lightmaps/LM_ROOM_engineering_blackout.png",
+        "scale": 19.493336,
+        "lightMapIntensity": 0.161162,
+        "bake_seconds": 43.0,
+        "stats": {
+          "p50": 0.00154,
+          "p_scale": 0.04617,
+          "max": 1.91652
+        }
+      },
+      {
+        "room": "ROOM_corridor",
+        "state": "blackout",
+        "file": "lightmaps/LM_ROOM_corridor_blackout.png",
+        "scale": 28.231197,
+        "lightMapIntensity": 0.111281,
+        "bake_seconds": 32.8,
+        "stats": {
+          "p50": 0.00204,
+          "p_scale": 0.03188,
+          "max": 2.05408
+        }
+      }
+    ]
+  }
+}

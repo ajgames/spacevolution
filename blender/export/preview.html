@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ship Lightmap Preview</title>
+<!--
+  Local preview of the exported rooms with their baked lightmaps, wired up the
+  same way the game should do it (see applyLightmaps below).
+  Serve this folder over HTTP, e.g.:  python3 -m http.server 8765 --directory export
+  then open http://localhost:8765/preview.html
+-->
+<style>
+  :root { --bg: #0b0d0d; --panel: rgba(12, 16, 16, 0.82); --text: #d8d2c4; --muted: #8a877e; --amber: #f0a040; --line: #2a3130; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.4 ui-monospace, Menlo, monospace; }
+  canvas { display: block; }
+  #ui { position: fixed; top: 12px; left: 12px; background: var(--panel); border: 1px solid var(--line); padding: 10px 12px; max-width: calc(100vw - 48px); }
+  #ui h1 { font-size: 12px; margin: 0 0 8px; color: var(--amber); letter-spacing: 0.08em; text-transform: uppercase; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; align-items: center; }
+  .row span { color: var(--muted); min-width: 64px; }
+  button { background: #1a2020; color: var(--text); border: 1px solid var(--line); padding: 4px 8px; font: inherit; cursor: pointer; }
+  button.on { border-color: var(--amber); color: var(--amber); }
+  label { color: var(--muted); cursor: pointer; }
+  #status { color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>Starter ship - baked lighting</h1>
+  <div class="row" id="views"><span>view</span></div>
+  <div class="row" id="states"><span>lighting</span></div>
+  <div class="row"><span>options</span>
+    <label><input type="checkbox" id="lm" checked> lightmap</label>
+    <label><input type="checkbox" id="env" checked> reflections</label>
+  </div>
+  <div id="status">loading...</div>
+</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const statusEl = document.getElementById('status');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.AgXToneMapping;          // matches Blender's AgX view
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envMap;
+// faint, only so metal edges read; scaled per state so it never out-shines the bake
+const ENV = { normal: 0.1, emergency: 0.012, blackout: 0.008 };
+
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.05, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Blender (x, y, z) -> three.js (x, z, -y)
+const b2t = (x, y, z) => new THREE.Vector3(x, z, -y);
+const VIEWS = {
+  command:     [b2t(-1.6, 5.45, 1.7), b2t(0.6, 9.6, 1.15)],
+  cryo:        [b2t(-5.45, 0.55, 1.7), b2t(-10.8, -0.4, 1.2)],
+  engineering: [b2t(5.45, -0.9, 1.7), b2t(10.8, 1.0, 1.25)],
+  corridor:    [b2t(0, 4.4, 1.7), b2t(0, -1.8, 0.7)],
+  arm:         [b2t(2.9, -0.35, 1.7), b2t(-4.9, 0.25, 1.15)],
+};
+
+// Emissive materials per lighting state (same roles as bake_lightmaps.py)
+const ROLE = { MAT_emit_warm: 'strip', MAT_emit_red: 'alarm', MAT_emit_amber: 'indicator',
+               MAT_display: 'indicator', MAT_screen: 'screen', MAT_emit_blink: 'dynamic' };
+const ROLE_ON = { normal: ['strip', 'indicator', 'screen', 'dynamic'],
+                  emergency: ['alarm', 'indicator', 'screen', 'dynamic'],
+                  blackout: ['indicator', 'screen', 'dynamic'] };
+
+const manifest = await (await fetch('lightmaps/manifest.json')).json();
+const loader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
+const rooms = {};
+const materials = new Set();
+let state = 'normal';
+
+for (const [room, info] of Object.entries(manifest.rooms)) {
+  statusEl.textContent = `loading ${info.glb}...`;
+  const gltf = await loader.loadAsync(info.glb);
+  scene.add(gltf.scene);
+  rooms[room] = { root: gltf.scene, info, maps: {} };
+  gltf.scene.traverse(o => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) {
+      m.userData.baseEmissive ??= m.emissiveIntensity;
+      materials.add(m);
+    }
+  });
+}
+
+function lightmap(room, st) {
+  const r = rooms[room];
+  if (!r.maps[st]) {
+    const t = texLoader.load(r.info.lightmaps[st].file);
+    t.flipY = false;                       // glTF UV convention
+    t.colorSpace = THREE.SRGBColorSpace;   // PNG is sRGB-encoded linear light
+    t.channel = 1;                         // TEXCOORD_1 -> geometry.attributes.uv1
+    r.maps[st] = t;
+  }
+  return r.maps[st];
+}
+
+// The part the game needs: every material of a room gets that room's lightmap and
+// the matching intensity (PI / scale, stored per room and state in the manifest).
+function applyLightmaps(st, enabled) {
+  for (const [room, r] of Object.entries(rooms)) {
+    const map = enabled ? lightmap(room, st) : null;
+    const intensity = r.info.lightmaps[st].lightMapIntensity;
+    r.root.traverse(o => {
+      if (!o.isMesh) return;
+      for (const m of [].concat(o.material)) {
+        m.lightMap = map;
+        m.lightMapIntensity = intensity;
+        m.needsUpdate = true;
+      }
+    });
+  }
+  scene.environmentIntensity = ENV[st];
+  for (const m of materials) {
+    const role = ROLE[m.name];
+    if (role) m.emissiveIntensity = ROLE_ON[st].includes(role) ? m.userData.baseEmissive : 0;
+  }
+}
+
+function setView(k) {
+  const [p, t] = VIEWS[k];
+  camera.position.copy(p);
+  controls.target.copy(t);
+  controls.update();
+  mark('views', k);
+}
+function setState(s) {
+  state = s;
+  applyLightmaps(state, document.getElementById('lm').checked);
+  mark('states', s);
+}
+function mark(group, k) {
+  for (const b of document.querySelectorAll(`#${group} button`)) b.classList.toggle('on', b.dataset.k === k);
+}
+for (const k of Object.keys(VIEWS)) addButton('views', k, () => setView(k));
+for (const s of ['normal', 'emergency', 'blackout']) addButton('states', s, () => setState(s));
+function addButton(group, k, fn) {
+  const b = document.createElement('button');
+  b.textContent = k; b.dataset.k = k; b.onclick = fn;
+  document.getElementById(group).appendChild(b);
+}
+document.getElementById('lm').onchange = () => setState(state);
+document.getElementById('env').onchange = e => { scene.environment = e.target.checked ? envMap : null; };
+
+const params = new URLSearchParams(location.search);
+setView(params.get('view') in VIEWS ? params.get('view') : 'command');
+setState(['normal', 'emergency', 'blackout'].includes(params.get('state')) ? params.get('state') : 'normal');
+statusEl.textContent = `${Object.keys(rooms).length} rooms, ${manifest.resolution}px lightmaps. Drag to look around.`;
+
+const blink = [...materials].filter(m => m.name === 'MAT_emit_blink');
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(t => {
+  for (const m of blink) m.emissiveIntensity = (Math.sin(t * 0.00628) > 0 ? 1 : 0.08) * m.userData.baseEmissive;
+  controls.update();
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
