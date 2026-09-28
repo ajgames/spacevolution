@@ -21,6 +21,8 @@ export default function Landing() {
       {/* CRT scanlines over the whole page */}
       <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.025)_0_1px,transparent_1px_3px)]" />
       <div className="relative w-full max-w-3xl">
+        {/* Same art as public/logo.png at a fraction of the weight; `npm run icons` redraws both. */}
+        <img src="/logo.svg" alt="" width={144} height={144} className="mb-6 -ml-2 size-28 sm:size-36" />
         <p className="text-xs tracking-[0.3em] text-[#8a877e] uppercase">Sleeper ship // caretaker terminal</p>
         <h1 className="mt-3 text-4xl font-bold tracking-[0.2em] text-[#f0a040] uppercase sm:text-5xl">
           Spacevelution

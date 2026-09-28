@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <filter id="glow" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="near"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="20" result="far"/>
+      <feComponentTransfer in="far" result="farDim"><feFuncA type="linear" slope="0.75"/></feComponentTransfer>
+      <feMerge><feMergeNode in="farDim"/><feMergeNode in="near"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="near"/>
+      <feMerge><feMergeNode in="near"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="hull"><path d="M442.25 257 L581.75 257 L615.5 290.75 L615.5 430.25 L539 430.25 L539 577.4 L687.5 577.4 L687.5 538.25 L725.75 500 L856.25 500 L894.5 538.25 L894.5 668.75 L856.25 707 L725.75 707 L687.5 668.75 L687.5 629.6 L336.5 629.6 L336.5 668.75 L298.25 707 L167.75 707 L129.5 668.75 L129.5 538.25 L167.75 500 L298.25 500 L336.5 538.25 L336.5 577.4 L485 577.4 L485 430.25 L408.5 430.25 L408.5 290.75 Z"/></clipPath>
+    <radialGradient id="wash" cx="512" cy="512" r="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f0a040" stop-opacity="0.09"/>
+      <stop offset="0.75" stop-color="#f0a040" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#f0a040" stop-opacity="0.06"/>
+    </radialGradient>
+  </defs>
+
+  <!-- scope: faint phosphor wash, ring, graduations -->
+  <circle cx="512" cy="512" r="440" fill="url(#wash)"/>
+  <g filter="url(#soft)" fill="none" stroke="#f0a040" stroke-linecap="round">
+    <circle cx="512" cy="512" r="440" stroke-width="5" opacity="0.7"/>
+    <path d="M559.04 64.47 L560.29 52.53 M605.56 71.83 L608.06 60.1 M651.06 84.02 L654.77 72.61 M695.03 100.9 L699.91 89.94 M737 122.29 L749 101.5 M776.5 147.94 L783.56 138.23 M813.11 177.58 L821.14 168.67 M846.42 210.89 L855.33 202.86 M876.06 247.5 L885.77 240.44 M901.71 287 L922.5 275 M923.1 328.97 L934.06 324.09 M939.98 372.94 L951.39 369.23 M952.17 418.44 L963.9 415.94 M959.53 464.96 L971.47 463.71 M959.53 559.04 L971.47 560.29 M952.17 605.56 L963.9 608.06 M939.98 651.06 L951.39 654.77 M923.1 695.03 L934.06 699.91 M901.71 737 L922.5 749 M876.06 776.5 L885.77 783.56 M846.42 813.11 L855.33 821.14 M813.11 846.42 L821.14 855.33 M776.5 876.06 L783.56 885.77 M737 901.71 L749 922.5 M695.03 923.1 L699.91 934.06 M651.06 939.98 L654.77 951.39 M605.56 952.17 L608.06 963.9 M559.04 959.53 L560.29 971.47 M464.96 959.53 L463.71 971.47 M418.44 952.17 L415.94 963.9 M372.94 939.98 L369.23 951.39 M328.97 923.1 L324.09 934.06 M287 901.71 L275 922.5 M247.5 876.06 L240.44 885.77 M210.89 846.42 L202.86 855.33 M177.58 813.11 L168.67 821.14 M147.94 776.5 L138.23 783.56 M122.29 737 L101.5 749 M100.9 695.03 L89.94 699.91 M84.02 651.06 L72.61 654.77 M71.83 605.56 L60.1 608.06 M64.47 559.04 L52.53 560.29 M64.47 464.96 L52.53 463.71 M71.83 418.44 L60.1 415.94 M84.02 372.94 L72.61 369.23 M100.9 328.97 L89.94 324.09 M122.29 287 L101.5 275 M147.94 247.5 L138.23 240.44 M177.58 210.89 L168.67 202.86 M210.89 177.58 L202.86 168.67 M247.5 147.94 L240.44 138.23 M287 122.29 L275 101.5 M328.97 100.9 L324.09 89.94 M372.94 84.02 L369.23 72.61 M418.44 71.83 L415.94 60.1 M464.96 64.47 L463.71 52.53" stroke-width="4" opacity="0.5"/>
+    <path d="M524 62 L512 28 L500 62 Z M962 524 L996 512 L962 500 Z M500 962 L512 996 L524 962 Z M62 500 L28 512 L62 524 Z" fill="#f0a040" stroke="none" opacity="0.8"/>
+  </g>
+
+  <path d="M442.25 257 L581.75 257 L615.5 290.75 L615.5 430.25 L539 430.25 L539 577.4 L687.5 577.4 L687.5 538.25 L725.75 500 L856.25 500 L894.5 538.25 L894.5 668.75 L856.25 707 L725.75 707 L687.5 668.75 L687.5 629.6 L336.5 629.6 L336.5 668.75 L298.25 707 L167.75 707 L129.5 668.75 L129.5 538.25 L167.75 500 L298.25 500 L336.5 538.25 L336.5 577.4 L485 577.4 L485 430.25 L408.5 430.25 L408.5 290.75 Z" fill="#f0a040" opacity="0.1"/>
+  <g clip-path="url(#hull)" fill="none" stroke="#f0a040" stroke-width="3" opacity="0.5" stroke-linejoin="round">
+    <rect x="173.15" y="513.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="173.15" y="648.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="218.15" y="513.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="218.15" y="648.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="263.15" y="513.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="263.15" y="648.5" width="34.2" height="45" rx="6.3"/>
+    <rect x="840.5" y="545" width="36" height="28.8" rx="1.8"/>
+    <rect x="840.5" y="576.5" width="36" height="28.8" rx="1.8"/>
+    <rect x="840.5" y="608" width="36" height="28.8" rx="1.8"/>
+    <rect x="840.5" y="639.5" width="36" height="28.8" rx="1.8"/>
+    <path d="M444.5 333.5 L469.25 299.75 L554.75 299.75 L579.5 333.5"/>
+    <rect x="502.1" y="333.5" width="19.8" height="19.8" rx="3.6"/>
+    <path d="M235.25 603.5 L764 603.5" stroke-width="4" stroke-dasharray="4 14" stroke-linecap="round" opacity="0.9"/>
+  </g>
+
+  <!-- hull: an amber beam with a hot core -->
+  <g filter="url(#glow)" fill="none" stroke-linejoin="round">
+    <path d="M442.25 257 L581.75 257 L615.5 290.75 L615.5 430.25 L539 430.25 L539 577.4 L687.5 577.4 L687.5 538.25 L725.75 500 L856.25 500 L894.5 538.25 L894.5 668.75 L856.25 707 L725.75 707 L687.5 668.75 L687.5 629.6 L336.5 629.6 L336.5 668.75 L298.25 707 L167.75 707 L129.5 668.75 L129.5 538.25 L167.75 500 L298.25 500 L336.5 538.25 L336.5 577.4 L485 577.4 L485 430.25 L408.5 430.25 L408.5 290.75 Z" stroke="#f0a040" stroke-width="11"/>
+    <path d="M442.25 257 L581.75 257 L615.5 290.75 L615.5 430.25 L539 430.25 L539 577.4 L687.5 577.4 L687.5 538.25 L725.75 500 L856.25 500 L894.5 538.25 L894.5 668.75 L856.25 707 L725.75 707 L687.5 668.75 L687.5 629.6 L336.5 629.6 L336.5 668.75 L298.25 707 L167.75 707 L129.5 668.75 L129.5 538.25 L167.75 500 L298.25 500 L336.5 538.25 L336.5 577.4 L485 577.4 L485 430.25 L408.5 430.25 L408.5 290.75 Z" stroke="#ffe4bd" stroke-width="3.5" opacity="0.85"/>
+  </g>
+
+  <!-- engineering's blinking button -->
+  <g filter="url(#glow)">
+    <circle cx="795.5" cy="603.5" r="27.9" fill="none" stroke="#ff4a3d" stroke-width="3" opacity="0.55"/>
+    <circle cx="795.5" cy="603.5" r="11.7" fill="#ff4a3d"/>
+    <circle cx="795.5" cy="603.5" r="4.5" fill="#ffd2c8"/>
+  </g>
+</svg>

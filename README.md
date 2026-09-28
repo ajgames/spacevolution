@@ -6,6 +6,7 @@ First-person space maintenance game built with React Three Fiber (`three`, `@rea
 - `npm run build`: typecheck and build to `dist/`
 - `npm run typecheck`: typecheck only
 - `npm run sync:ship`: copy the ship assets into `public/ship/` by hand
+- `npm run icons`: redraw the logo and favicons into `public/` (`scripts/icons.ts`, needs Chrome)
 
 ## Scenes
 
