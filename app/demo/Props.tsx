@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import { MathUtils, type MeshStandardMaterial, type PointLight, Vector3 } from 'three'
-import { sfx } from './audio.ts'
+import { sfx, soundAt } from './audio.ts'
 import { BREAKER_BUTTONS, findObject, meshesOf, useRooms } from './objects.ts'
 import { DOORS, FAILING_POD, useDemo } from './store.ts'
 
@@ -110,24 +110,29 @@ const CORRIDOR_PULSE: { position: [number, number, number]; intensity: number }[
   { position: [3.9, 2.2, 0], intensity: 1.3 },
 ]
 
+const PULSE_SOURCES = ['LIGHT_BLINK_engineering', ...CORRIDOR_PULSE.map((p) => p.position)]
+
+// The lights stay mounted and go dark after the blackout: adding or removing a
+// light changes every lit material's shader, and three.js recompiles them all
+// in the frame it happens.
 export function PulseLights() {
   const rooms = useRooms()
-  const phase = useDemo((s) => s.phase)
   const lamp = useMemo(() => findObject(rooms, 'LIGHT_BLINK_engineering').getWorldPosition(new Vector3()), [rooms])
   const lights = useRef<(PointLight | null)[]>([])
   const wasOn = useRef(false)
   const level = useRef(0)
   useFrame(({ clock }, dt) => {
+    const { phase, started } = useDemo.getState()
     // Same clock and phase as the blinking button material in ShipRooms.
-    const on = Math.sin(clock.elapsedTime * Math.PI * 2) > 0
-    if (on && !wasOn.current && useDemo.getState().phase === 'blackout' && useDemo.getState().started) sfx.pulseTick()
+    const on = phase === 'blackout' && Math.sin(clock.elapsedTime * Math.PI * 2) > 0
+    // The tick sounds from the lamp and the trail alike (in the walk mode; the demo plays it flat).
+    if (on && !wasOn.current && started) soundAt(PULSE_SOURCES, sfx.pulseTick, { cue: 'pulse', reach: 4 })
     wasOn.current = on
     level.current = MathUtils.damp(level.current, on ? 1 : 0, 16, dt)
     lights.current.forEach((light, i) => {
       if (light) light.intensity = level.current * (i === 0 ? 2.5 : CORRIDOR_PULSE[i - 1].intensity)
     })
   })
-  if (phase !== 'blackout') return null
   return (
     <>
       {[[lamp.x, lamp.y, lamp.z + 0.25] as const, ...CORRIDOR_PULSE.map((p) => p.position)].map((position, i) => (
@@ -148,13 +153,17 @@ export function PulseLights() {
 }
 
 // The rotating alarm beacons sweep past every two seconds in emergency lighting
-// (ShipRooms swells the lightmaps in time); a quiet whoop goes with each sweep.
+// (ShipRooms swells the lightmaps in time); a quiet whoop goes with each sweep,
+// from every beacon at once.
+const BEACONS = ['LIGHT_alarm_command', 'LIGHT_alarm_corridor', 'LIGHT_alarm_cryo', 'LIGHT_alarm_engineering']
+
 export function AlarmSync() {
   const wasUp = useRef(false)
   useFrame(({ clock }) => {
     const { phase, started } = useDemo.getState()
     const up = Math.sin(clock.elapsedTime * Math.PI) > 0.95
-    if (up && !wasUp.current && started && (phase === 'emergency' || phase === 'breakersSet')) sfx.alarm()
+    if (up && !wasUp.current && started && (phase === 'emergency' || phase === 'breakersSet'))
+      soundAt(BEACONS, sfx.alarm, { cue: 'alarm', reach: 3 })
     wasUp.current = up
   })
   return null

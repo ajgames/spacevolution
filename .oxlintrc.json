@@ -18,7 +18,8 @@
     {
       "files": [
         "app/scene/**",
-        "app/demo/**"
+        "app/demo/**",
+        "app/construct/**"
       ],
       "rules": {
         "react/immutability": "off"

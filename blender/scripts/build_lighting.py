@@ -1,7 +1,7 @@
 """Step 5c: three bakeable lighting states, one collection each.
 
 LIGHTS_normal     warm overhead strips (one area light per ceiling fixture)
-LIGHTS_emergency  dim red from the alarm beacons
+LIGHTS_emergency  red alarm beacons, plus the strip fixtures switched to red for a low fill
 LIGHTS_blackout   only screen and indicator glow (small, dim area lights)
 
 Light objects are named BAKE_<state>_<where>_NN: they exist for baking only and
@@ -20,6 +20,7 @@ WARM = (1.0, 0.78, 0.55)
 RED = (1.0, 0.07, 0.03)
 AMBER = (1.0, 0.6, 0.2)
 CRT = (0.75, 0.85, 0.7)
+EMERGENCY_FILL = 1.0        # emergency strip power as a fraction of normal (red reads ~1/3 as bright per watt)
 
 
 def _area(name, coll, loc, size, power, color, rot=(0, 0, 0), shape="RECTANGLE"):
@@ -61,18 +62,10 @@ def _facing(normal):
     return Vector(normal).to_track_quat("-Z", "Y").to_euler()
 
 
-def build():
-    L.clear_objects(lambda o: o.get("stage") == "lighting")
-    for ld in [d for d in bpy.data.lights if d.users == 0]:
-        bpy.data.lights.remove(ld)
-    colls = {n: L.collection(n) for n in L.LIGHT_COLLECTIONS}
-    counts = {n: 0 for n in L.LIGHT_COLLECTIONS}
-
-    # ---------------------------------------------------------------- normal
-    # One area light under every warm light-strip lens (faces using MAT_emit_warm),
-    # read from the evaluated geometry so it works before and after transforms are
-    # applied by the export script.
-    cn = colls["LIGHTS_normal"]
+def _strip_lenses():
+    """Every warm light-strip lens (faces using MAT_emit_warm) as (room, centre, normal,
+    long side, short side, long-side vector), read from the evaluated geometry so it
+    works before and after transforms are applied by the export script."""
     for cname in L.ROOM_COLLECTIONS:
         room = cname[len("ROOM_"):]
         for ob in bpy.data.collections[cname].all_objects:
@@ -87,21 +80,40 @@ def build():
                 if poly.material_index not in slots:
                     continue
                 vs = [mw @ me.vertices[i].co for i in poly.vertices]
-                c = sum(vs, Vector()) / len(vs)
-                n = (mw.to_3x3() @ poly.normal).normalized()
                 e0, e1 = vs[1] - vs[0], vs[2] - vs[1]
                 a, b = sorted((e0.length, e1.length), reverse=True)
-                area = a * b
-                power = 160 if area > 0.5 else (60 if area > 0.2 else 45)
-                long_axis = e0 if e0.length >= e1.length else e1
-                rot = n.to_track_quat("-Z", "Y").to_euler()
-                counts["LIGHTS_normal"] += 1
-                lt = _area(f"BAKE_normal_{room}_{counts['LIGHTS_normal']:02d}", cn, c + n * 0.045,
-                           (a * 0.96, b * 0.9), power, WARM, rot=rot)
-                # align the light's long side with the lens
-                lx = rot.to_matrix() @ Vector((1, 0, 0))
-                if abs(lx.normalized().dot(long_axis.normalized())) < 0.7:
-                    lt.data.size, lt.data.size_y = b * 0.9, a * 0.96
+                yield (room, sum(vs, Vector()) / len(vs), (mw.to_3x3() @ poly.normal).normalized(),
+                       a, b, e0 if e0.length >= e1.length else e1)
+
+
+def _strip_light(name, coll, lens, scale, color):
+    """An area light just under a strip lens, `scale` times the strip's full power."""
+    _room, c, n, a, b, long_axis = lens
+    area = a * b
+    power = 160 if area > 0.5 else (60 if area > 0.2 else 45)
+    rot = n.to_track_quat("-Z", "Y").to_euler()
+    lt = _area(name, coll, c + n * 0.045, (a * 0.96, b * 0.9), power * scale, color, rot=rot)
+    # align the light's long side with the lens
+    lx = rot.to_matrix() @ Vector((1, 0, 0))
+    if abs(lx.normalized().dot(long_axis.normalized())) < 0.7:
+        lt.data.size, lt.data.size_y = b * 0.9, a * 0.96
+    return lt
+
+
+def build():
+    L.clear_objects(lambda o: o.get("stage") == "lighting")
+    for ld in [d for d in bpy.data.lights if d.users == 0]:
+        bpy.data.lights.remove(ld)
+    colls = {n: L.collection(n) for n in L.LIGHT_COLLECTIONS}
+    counts = {n: 0 for n in L.LIGHT_COLLECTIONS}
+
+    # ---------------------------------------------------------------- normal
+    # One area light under every warm light-strip lens.
+    lenses = list(_strip_lenses())
+    cn = colls["LIGHTS_normal"]
+    for lens in lenses:
+        counts["LIGHTS_normal"] += 1
+        _strip_light(f"BAKE_normal_{lens[0]}_{counts['LIGHTS_normal']:02d}", cn, lens, 1.0, WARM)
 
     # ------------------------------------------------------------- emergency
     ce = colls["LIGHTS_emergency"]
@@ -112,6 +124,11 @@ def build():
             # light just below the beacon so it is not occluded
             _point("BAKE_emergency_" + ob.name[len("LIGHT_alarm_"):], ce,
                    ob.matrix_world.translation + Vector((0, 0, -0.1)), ob.get("bake_power", 25.0), RED, 0.05)
+    # The strip fixtures on emergency power: the normal lights in red, so the whole room
+    # sits in a low red glow and the beacons carry the highlights.
+    for i, lens in enumerate(lenses, 1):
+        counts["LIGHTS_emergency"] += 1
+        _strip_light(f"BAKE_emergency_{lens[0]}_{i:02d}", ce, lens, EMERGENCY_FILL, RED)
 
     # -------------------------------------------------------------- blackout
     cb = colls["LIGHTS_blackout"]

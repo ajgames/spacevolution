@@ -5,6 +5,8 @@
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let noise: AudioBuffer | null = null
+// Where new sounds connect: the master bus, or a placed sound's panners (soundAt).
+let output: AudioNode | null = null
 
 export function unlockAudio() {
   if (!ctx) {
@@ -12,6 +14,7 @@ export function unlockAudio() {
     master = ctx.createGain()
     master.gain.value = 0.8
     master.connect(ctx.destination)
+    output = master
     noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
     const data = noise.getChannelData(0)
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1
@@ -23,9 +26,123 @@ export function setMuted(muted: boolean) {
   if (ctx && master) master.gain.setTargetAtTime(muted ? 0 : 0.8, ctx.currentTime, 0.05)
 }
 
+// The context and master bus, for callers that build their own graphs (the
+// walk mode's voice and droid). Null until unlockAudio().
+export const audioGraph = () => (ctx && master ? { ctx, master } : null)
+
+// --- placed sounds -----------------------------------------------------------
+
+// The Myst demo plays everything flat. The walk mode installs a Space, and
+// then every sound tied to a ship object plays from where that object is,
+// muffled by the walls between it and the listener.
+export type Point = [number, number, number]
+export type Space = {
+  locate: (anchor: string) => Point | undefined
+  // How much of a sound at `point` gets through to the listener: 1 in the same room.
+  transmission: (point: Point) => number
+  // Every placed sound, for the on-screen cues.
+  heard?: (cue: string, points: Point[], reach: number) => void
+}
+let space: Space | null = null
+export const setSpace = (s: Space | null) => (space = s)
+
+// One source position: walls (gain and a low-pass) into an HRTF panner. At
+// `reach` metres or closer the sound plays at full level, then falls off.
+export function placement(c: AudioContext, [x, y, z]: Point, reach: number) {
+  const wall = c.createGain()
+  const muffle = filter(c, 'lowpass', 20000, 0.5)
+  const panner = new PannerNode(c, {
+    panningModel: 'HRTF',
+    distanceModel: 'inverse',
+    refDistance: reach,
+    rolloffFactor: 1.4,
+    positionX: x,
+    positionY: y,
+    positionZ: z,
+  })
+  wall.connect(muffle).connect(panner).connect(master!)
+  // 0..1: a closed door leaves a dull thud, an open one most of the highs.
+  const setTransmission = (t: number, smoothing = 0) => {
+    const gain = 0.08 + 0.92 * t
+    const cutoff = 500 + 19500 * t * t
+    if (smoothing) {
+      wall.gain.setTargetAtTime(gain, c.currentTime, smoothing)
+      muffle.frequency.setTargetAtTime(cutoff, c.currentTime, smoothing)
+    } else {
+      wall.gain.value = gain
+      muffle.frequency.value = cutoff
+    }
+  }
+  return { input: wall, panner, setTransmission }
+}
+
+// One placement per source point, shared by every sound played from it, so a
+// teletype ticking two dozen times a second doesn't build a panner per tick.
+// A moving source (the droid) makes new points, so the cache is capped.
+const placements = new Map<string, ReturnType<typeof placement>>()
+function placementAt(c: AudioContext, point: Point, reach: number) {
+  const key = `${point.join(',')}@${reach}`
+  let placed = placements.get(key)
+  if (!placed) {
+    if (placements.size >= 64) placements.clear()
+    placed = placement(c, point, reach)
+    placements.set(key, placed)
+  }
+  return placed
+}
+
+// Plays a sound from ship objects (by name) or points, or flat when there's no
+// Space. Several anchors play the sound from each (the alarm beacons), so the
+// nearest dominates. `cue` names it for the on-screen cues.
+type Anchor = string | Point
+export function soundAt<T>(anchor: Anchor | readonly Anchor[], play: () => T, options: { cue?: string; reach?: number } = {}): T {
+  const { cue, reach = 2 } = options
+  const anchors: readonly Anchor[] = typeof anchor === 'string' || typeof anchor[0] === 'number' ? [anchor as Anchor] : (anchor as readonly Anchor[])
+  const points: Point[] = []
+  for (const a of ctx && space ? anchors : []) {
+    const point = typeof a === 'string' ? space!.locate(a) : a
+    if (point) points.push(point)
+  }
+  if (!ctx || !space || !points.length) return play()
+  const input = ctx.createGain()
+  for (const point of points) {
+    const placed = placementAt(ctx, point, reach)
+    placed.setTransmission(space.transmission(point))
+    input.connect(placed.input)
+  }
+  output = input
+  try {
+    return play()
+  } finally {
+    output = master
+    if (cue) space.heard?.(cue, points, reach)
+  }
+}
+
+// The listener sits at the camera, facing where it faces.
+export function listenFrom(position: Point, forward: Point, up: Point) {
+  if (!ctx) return
+  const l = ctx.listener
+  if (l.positionX) {
+    l.positionX.value = position[0]
+    l.positionY.value = position[1]
+    l.positionZ.value = position[2]
+    l.forwardX.value = forward[0]
+    l.forwardY.value = forward[1]
+    l.forwardZ.value = forward[2]
+    l.upX.value = up[0]
+    l.upY.value = up[1]
+    l.upZ.value = up[2]
+  } else {
+    // Firefox only has the older setters.
+    l.setPosition(...position)
+    l.setOrientation(...forward, ...up)
+  }
+}
+
 type Env = { at?: number; attack?: number; hold?: number; release: number; peak: number }
 
-// A gain node with an attack/hold/release envelope, feeding the master bus.
+// A gain node with an attack/hold/release envelope, feeding the output.
 function envelope(c: AudioContext, { at = 0, attack = 0.005, hold = 0, release, peak }: Env) {
   const g = c.createGain()
   const t = c.currentTime + at
@@ -33,18 +150,18 @@ function envelope(c: AudioContext, { at = 0, attack = 0.005, hold = 0, release, 
   g.gain.linearRampToValueAtTime(peak, t + attack)
   g.gain.setValueAtTime(peak, t + attack + hold)
   g.gain.exponentialRampToValueAtTime(0.0001, t + attack + hold + release)
-  g.connect(master!)
+  g.connect(output!)
   return { gain: g, start: t, end: t + attack + hold + release + 0.05 }
 }
 
-function noiseSource(c: AudioContext, loop = false) {
+export function noiseSource(c: AudioContext, loop = false) {
   const src = c.createBufferSource()
   src.buffer = noise
   src.loop = loop
   return src
 }
 
-function filter(c: AudioContext, type: BiquadFilterType, frequency: number, q = 0.7) {
+export function filter(c: AudioContext, type: BiquadFilterType, frequency: number, q = 0.7) {
   const f = c.createBiquadFilter()
   f.type = type
   f.frequency.value = frequency
@@ -81,7 +198,7 @@ function bed(build: (c: AudioContext, out: GainNode) => AudioScheduledSourceNode
   const out = c.createGain()
   out.gain.setValueAtTime(0, c.currentTime)
   out.gain.linearRampToValueAtTime(level, c.currentTime + fade)
-  out.connect(master!)
+  out.connect(output!)
   const sources = build(c, out)
   for (const s of sources) s.start()
   let stopped = false
@@ -230,6 +347,33 @@ export const sfx = {
       stop(0.08)
       sfx.clunk()
     }
+  },
+
+  // A boot on deck plating: a soft thud with a little ring from the grating.
+  footstep: (weight = 1) => {
+    const pitch = 0.9 + Math.random() * 0.2
+    burst('lowpass', 260 * pitch, { attack: 0.004, release: 0.12, peak: 0.12 * weight })
+    tone('sine', 95 * pitch, 55, { release: 0.1, peak: 0.1 * weight })
+    burst('bandpass', 3200 * pitch, { at: 0.012, release: 0.05, peak: 0.018 * weight }, 5)
+  },
+
+  // A door control panel: the button's click, then a two-tone acknowledge.
+  doorPanel: () => {
+    burst('highpass', 2800, { release: 0.03, peak: 0.25 })
+    tone('square', 1320, 1320, { at: 0.05, hold: 0.06, release: 0.04, peak: 0.02 })
+    tone('square', 1760, 1760, { at: 0.15, hold: 0.08, release: 0.05, peak: 0.02 })
+  },
+
+  // The PA's two-note chime before the steward speaks.
+  chime: () => {
+    tone('sine', 880, 878, { attack: 0.01, hold: 0.12, release: 0.9, peak: 0.07 })
+    tone('sine', 660, 658, { at: 0.28, attack: 0.01, hold: 0.12, release: 1.2, peak: 0.07 })
+  },
+
+  // Taking and letting go of the droid joystick: a gimbal click and a servo blip.
+  grab: (taking: boolean) => {
+    burst('highpass', 2500, { release: 0.04, peak: 0.2 })
+    tone('square', taking ? 520 : 760, taking ? 780 : 480, { at: 0.04, release: 0.12, peak: 0.02 })
   },
 }
 

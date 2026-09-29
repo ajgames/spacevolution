@@ -10,7 +10,8 @@
     "sync:ship": "node scripts/sync-ship.ts",
     "icons": "node scripts/icons.ts",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "voice": "node scripts/voice.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

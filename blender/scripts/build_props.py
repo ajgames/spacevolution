@@ -616,10 +616,10 @@ def build_doors_and_beacons(rooms):
                tuple(Vector(loc) + Vector((0, 0, 1.2))), (0, 0, rz), size=0.15, target=name, radius=1.2)
 
     bm = beacon_mesh()
-    beacons = [("command", "ROOM_command", (1.0, 5.45, L.ROOM_H), 60.0),
-               ("cryo", "ROOM_cryo", (-5.45, 1.0, L.ROOM_H), 60.0),
-               ("engineering", "ROOM_engineering", (5.45, -1.0, L.ROOM_H), 60.0),
-               ("corridor", "ROOM_corridor", (0.55, -0.55, L.CORR_H), 35.0)]
+    beacons = [("command", "ROOM_command", (1.0, 5.45, L.ROOM_H), 240.0),
+               ("cryo", "ROOM_cryo", (-5.45, 1.0, L.ROOM_H), 240.0),
+               ("engineering", "ROOM_engineering", (5.45, -1.0, L.ROOM_H), 240.0),
+               ("corridor", "ROOM_corridor", (0.55, -0.55, L.CORR_H), 140.0)]
     for key, room, loc, power in beacons:
         put(f"BEACON_alarm_{key}", bm, rooms[room], loc, static=True, module="MOD_alarm_beacon")
         marker(f"LIGHT_alarm_{key}", rooms[room], tuple(Vector(loc) + Vector((0, 0, -0.115))), display="SPHERE",

@@ -1,8 +1,9 @@
 import { useFBO } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, type Group, MathUtils, type Mesh, MeshBasicMaterial, PerspectiveCamera, SRGBColorSpace } from 'three'
-import { sfx } from './audio.ts'
+import { compileShaders } from '../scene/warmUp.ts'
+import { sfx, soundAt } from './audio.ts'
 import {
   AMBER,
   AMBER_DIM,
@@ -60,6 +61,14 @@ export function CommandScreens() {
     for (const s of screens) s.mesh.material = s.material
     return () => screens.forEach((s, i) => (s.mesh.material = original[i]))
   }, [screens])
+
+  // The feed is a second render pass with its own shaders. Build them at load
+  // (DemoScene warms the main pass) rather than on the first powered frame.
+  const gl = useThree((state) => state.gl)
+  const scene = useThree((state) => state.scene)
+  useEffect(() => {
+    void compileShaders(gl, scene, droidEye, feed)
+  }, [gl, scene, droidEye, feed])
 
   useFrame(({ gl, scene, clock }) => {
     const { phase, enteredAt } = useDemo.getState()
@@ -172,7 +181,7 @@ export function CoreCrt() {
       // Type the fault out once the tube has warmed up, with a teletype tick per character.
       const text = FAULT.join('\n')
       const chars = Math.max(0, Math.min(text.length, Math.floor((since - 1.8) * 24)))
-      if (chars > drawn.current.chars && text[chars - 1]?.trim()) sfx.type()
+      if (chars > drawn.current.chars && text[chars - 1]?.trim()) soundAt('CORE_rack_03', sfx.type)
       drawn.current.chars = chars
       clear(ctx)
       const lines = text.slice(0, chars).split('\n')
@@ -279,7 +288,8 @@ function reelTexture() {
 }
 
 // The tape rack's reels are part of its static mesh, so turning ones sit over
-// them once the tape starts playing on its own.
+// them once the tape starts playing on its own. Hidden rather than unmounted
+// until then, so the start-up warm-up (DemoScene) compiles their shader.
 export function TapeReels() {
   const phase = useDemo((s) => s.phase)
   const material = useMemo(() => new MeshBasicMaterial({ map: reelTexture(), transparent: true }), [])
@@ -291,9 +301,8 @@ export function TapeReels() {
       if (reel) reel.rotation.z -= speed.current * dt * (i === 0 ? 1 : 0.8)
     })
   })
-  if (!atLeast(phase, 'tapePlaying')) return null
   return (
-    <>
+    <group visible={atLeast(phase, 'tapePlaying')}>
       {[0.14, -0.14].map((lx, i) => (
         <group key={lx} position={rackPoint('CORE_rack_04', lx, 0.038, 1.76)} rotation={FACING_OUT_OF_RACK}>
           <group
@@ -307,6 +316,6 @@ export function TapeReels() {
           </group>
         </group>
       ))}
-    </>
+    </group>
   )
 }

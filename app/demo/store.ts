@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { LightingState } from '../scene/shipData.ts'
-import { playVoice, sfx, unlockAudio } from './audio.ts'
+import { playVoice, sfx, soundAt, unlockAudio } from './audio.ts'
 import { ENGINEERING, type Hotspot, SPOTS, type SpotId, headingBetween, nearestFacing } from './nodes.ts'
 
 // The demo is one small state machine. Lighting, screen content and which
@@ -22,6 +22,7 @@ const TRANSITIONS: Record<Phase, Partial<Record<Event, Phase>>> = {
 export const DOORS = ['DOOR_cryo', 'DOOR_engineering', 'DOOR_command']
 // When each command screen (status, mission, aux) starts to boot after full power.
 export const SCREEN_BOOT_MS = [900, 1500, 2100]
+const SCREENS = ['SCREEN_status', 'SCREEN_mission', 'SCREEN_aux']
 // The sleeper whose vitals are slipping. Its status panel flickers amber.
 export const FAILING_POD = 'CRYO_POD_06'
 
@@ -95,13 +96,11 @@ function send(event: Event) {
 const onEnter: Partial<Record<Phase, (from?: Phase) => void>> = {
   emergency: (from) => {
     if (from !== 'blackout') return
-    sfx.relay()
-    later(900, sfx.crtOn) // the core monitor wakes (see CoreCrt)
-    // Step back from the panel so the lights and the core monitor are in view.
-    later(1300, () => act.go('eng', 72))
+    soundAt('PANEL_blink', sfx.relay, { cue: 'relay', reach: 3 })
+    later(900, () => soundAt('CORE_rack_03', sfx.crtOn, { cue: 'monitor' })) // the core monitor wakes (see CoreCrt)
   },
   powered: () => {
-    for (const ms of SCREEN_BOOT_MS) later(ms, sfx.crtOn)
+    SCREEN_BOOT_MS.forEach((ms, i) => later(ms, () => soundAt(SCREENS[i], sfx.crtOn, { cue: 'screen' })))
   },
   tapePlaying: () => {
     // Give the camera time to arrive in engineering before the reels start.
@@ -125,6 +124,58 @@ const onEnter: Partial<Record<Phase, (from?: Phase) => void>> = {
 
 function press(object: string) {
   set((s) => ({ pressedAt: { ...s.pressedAt, [object]: performance.now() } }))
+}
+
+const BREAKER_NAMES = Array.from({ length: 8 }, (_, i) => `BTN_console_0${i + 1}`)
+
+// The puzzle itself, shared by both modes: the Myst demo reaches these through
+// its hotspots (act.hotspot), the walk mode through whatever the player clicks.
+// Each sound plays from the object that makes it (flat in the Myst demo).
+export const puzzle = {
+  openDoor(door: string) {
+    if (get().doorsOpen.includes(door)) return
+    set((s) => ({ doorsOpen: [...s.doorsOpen, door] }))
+    soundAt(door, sfx.door, { cue: 'door' })
+  },
+
+  openPod() {
+    set({ podOpen: true })
+    soundAt('CRYO_POD_01_glass', sfx.podOpen, { cue: 'seal' })
+  },
+
+  pressBlink() {
+    press('BTN_blink')
+    soundAt('BTN_blink', sfx.clunk)
+    later(180, () => send('PRESS_BLINK'))
+  },
+
+  toggleBreaker(i: number) {
+    const name = BREAKER_NAMES[i]
+    const breakers = get().breakers.map((b, j) => (j === i ? !b : b))
+    press(name)
+    soundAt(name, () => sfx.toggle(breakers[i]))
+    set({ breakers })
+    send(breakers.every((b, j) => b === get().pattern[j]) ? 'BREAKERS_MATCH' : 'BREAKERS_MISMATCH')
+  },
+
+  // The main button: full power with the right breakers, a fault without them.
+  pressMain() {
+    press('BTN_console_main')
+    soundAt('BTN_console_main', sfx.clunk)
+    if (send('PRESS_MAIN')) return
+    set({ stutter: true })
+    soundAt('BTN_console_main', sfx.stutter, { cue: 'fault' })
+    const closed = get()
+      .breakers.map((b, i) => (b ? i : -1))
+      .filter((i) => i >= 0)
+    closed.forEach((i, k) =>
+      later(1300 + k * 110, () => {
+        set((s) => ({ breakers: s.breakers.map((b, j) => (j === i ? false : b)) }))
+        soundAt(BREAKER_NAMES[i], () => sfx.toggle(false))
+      }),
+    )
+    later(1400 + closed.length * 110, () => set({ stutter: false }))
+  },
 }
 
 export const act = {
@@ -188,44 +239,23 @@ export const act = {
   hotspot(h: Hotspot) {
     if (h.kind === 'go') {
       if (!h.door || get().doorsOpen.includes(h.door)) return act.go(h.to, h.heading)
-      set((s) => ({ busy: true, doorsOpen: [...s.doorsOpen, h.door!] }))
-      sfx.door()
+      set({ busy: true })
+      puzzle.openDoor(h.door)
       return later(800, () => act.go(h.to, h.heading))
     }
     if (h.action === 'openPod') {
-      set({ podOpen: true, busy: true })
-      sfx.podOpen()
+      set({ busy: true })
+      puzzle.openPod()
       return later(1500, () => act.go('cryo', 148))
     }
     if (h.action === 'pressBlink') {
-      press('BTN_blink')
-      sfx.clunk()
-      return later(180, () => send('PRESS_BLINK'))
+      puzzle.pressBlink()
+      // Once the relays have gone, step back from the panel so the lights and
+      // the core monitor are in view.
+      return later(1480, () => act.go('eng', 72))
     }
-    if (h.action === 'breaker') {
-      const i = h.index!
-      const breakers = get().breakers.map((b, j) => (j === i ? !b : b))
-      press(h.objects[0])
-      sfx.toggle(breakers[i])
-      set({ breakers })
-      return send(breakers.every((b, j) => b === get().pattern[j]) ? 'BREAKERS_MATCH' : 'BREAKERS_MISMATCH')
-    }
-    // The main button: full power with the right breakers, a fault without them.
-    press('BTN_console_main')
-    sfx.clunk()
-    if (send('PRESS_MAIN')) return
-    set({ stutter: true })
-    sfx.stutter()
-    const closed = get()
-      .breakers.map((b, i) => (b ? i : -1))
-      .filter((i) => i >= 0)
-    closed.forEach((i, k) =>
-      later(1300 + k * 110, () => {
-        set((s) => ({ breakers: s.breakers.map((b, j) => (j === i ? false : b)) }))
-        sfx.toggle(false)
-      }),
-    )
-    later(1400 + closed.length * 110, () => set({ stutter: false }))
+    if (h.action === 'breaker') return puzzle.toggleBreaker(h.index!)
+    puzzle.pressMain()
   },
 
   setMoving(moving: boolean) {

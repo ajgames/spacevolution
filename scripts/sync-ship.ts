@@ -1,4 +1,5 @@
-// Mirrors the files the game needs from blender/export/ into public/ship/.
+// Mirrors the files the game needs from blender/export/ into public/ship/
+// (and the character GLBs into public/characters/, see syncCharacters).
 //
 // blender/export/lightmaps/manifest.json is the source of truth: it names every
 // room GLB and baked lightmap, so preview.html and the optional lightmaps/exr/
@@ -91,6 +92,36 @@ export async function syncShip(root: string): Promise<SyncResult> {
   return { copied: toCopy, removed, unchanged: files.size - toCopy.length, warnings }
 }
 
+// Characters (blender/scripts/export_character.py) are mirrored as they are: every
+// .glb in blender/export/characters/ lands in public/characters/.
+const CHARACTERS_EXPORT_DIR = 'blender/export/characters'
+const CHARACTERS_DIR = 'public/characters'
+
+export async function syncCharacters(root: string): Promise<SyncResult> {
+  const srcDir = join(root, CHARACTERS_EXPORT_DIR)
+  const destDir = join(root, CHARACTERS_DIR)
+  const names = (await readdir(srcDir).catch(() => [] as string[])).filter((name) => name.endsWith('.glb'))
+  const copied: string[] = []
+  for (const name of names) {
+    const src = join(srcDir, name)
+    const { size, mtime } = await stat(src)
+    const dest = await stat(join(destDir, name)).catch(() => null)
+    if (dest && dest.size === size && dest.mtime.getTime() === mtime.getTime()) continue
+    await assertComplete(src, size)
+    await mkdir(destDir, { recursive: true })
+    await copyFile(src, join(destDir, name))
+    await utimes(join(destDir, name), mtime, mtime)
+    copied.push(name)
+  }
+  const removed: string[] = []
+  for (const name of await readdir(destDir).catch(() => [] as string[])) {
+    if (names.includes(name)) continue
+    await rm(join(destDir, name))
+    removed.push(name)
+  }
+  return { copied, removed, unchanged: names.length - copied.length, warnings: [] }
+}
+
 // Blender writes exports in place, so a watcher can see a file half-written.
 // GLB's header records the total length, and a PNG always ends in an IEND chunk.
 async function assertComplete(path: string, size: number) {
@@ -105,9 +136,9 @@ async function assertComplete(path: string, size: number) {
   if (!ok) throw new Error(`${path} looks incomplete; is Blender still writing it?`)
 }
 
-function report(logger: Logger, { copied, removed, unchanged, warnings }: SyncResult) {
-  logger.info(`[ship] ${copied.length} copied, ${removed.length} removed, ${unchanged} unchanged`, { timestamp: true })
-  for (const w of warnings) logger.warn(`[ship] ${w}`, { timestamp: true })
+function report(logger: Logger, { copied, removed, unchanged, warnings }: SyncResult, tag = 'ship') {
+  logger.info(`[${tag}] ${copied.length} copied, ${removed.length} removed, ${unchanged} unchanged`, { timestamp: true })
+  for (const w of warnings) logger.warn(`[${tag}] ${w}`, { timestamp: true })
 }
 
 export function shipAssets(): Plugin {
@@ -119,7 +150,10 @@ export function shipAssets(): Plugin {
     },
     // Runs before Vite copies public/ into dist/, and a broken export fails the build.
     async buildStart() {
-      if (config.command === 'build') report(config.logger, await syncShip(config.root))
+      if (config.command === 'build') {
+        report(config.logger, await syncShip(config.root))
+        report(config.logger, await syncCharacters(config.root), 'characters')
+      }
     },
     async configureServer(server) {
       const exportDir = join(config.root, EXPORT_DIR)
@@ -133,6 +167,15 @@ export function shipAssets(): Plugin {
             if (result.copied.length || result.removed.length) server.ws.send({ type: 'full-reload' })
           } catch (err) {
             config.logger.error(`[ship] ${(err as Error).message}`, { timestamp: true })
+          }
+          try {
+            const result = await syncCharacters(config.root)
+            if (result.copied.length || result.removed.length) {
+              report(config.logger, result, 'characters')
+              server.ws.send({ type: 'full-reload' })
+            }
+          } catch (err) {
+            config.logger.error(`[characters] ${(err as Error).message}`, { timestamp: true })
           }
         })
       }
@@ -151,11 +194,15 @@ export function shipAssets(): Plugin {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    const { copied, removed, unchanged, warnings } = await syncShip(join(dirname(fileURLToPath(import.meta.url)), '..'))
+    const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+    const { copied, removed, unchanged, warnings } = await syncShip(root)
     for (const rel of copied) console.log(`copied   ${rel}`)
     for (const rel of removed) console.log(`removed  ${rel}`)
     console.log(`${copied.length} copied, ${removed.length} removed, ${unchanged} unchanged`)
     for (const w of warnings) console.warn(`warning: ${w}`)
+    const characters = await syncCharacters(root)
+    for (const rel of characters.copied) console.log(`copied   characters/${rel}`)
+    for (const rel of characters.removed) console.log(`removed  characters/${rel}`)
   } catch (err) {
     console.error((err as Error).message)
     process.exitCode = 1

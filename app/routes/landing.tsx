@@ -13,6 +13,18 @@ const SCENES = [
     title: 'Myst-style demo',
     body: 'Wake in the cryo bay during a blackout. Trace the fault, reset the breakers, bring the ship back up.',
   },
+  {
+    to: '/walk',
+    code: 'SCN-02',
+    title: 'First-person walk',
+    body: 'The same blackout on foot, with sound you can follow. Then the ship\'s steward wakes and hands you the droid.',
+  },
+  {
+    to: '/construct',
+    code: 'SCN-03',
+    title: 'The construct',
+    body: 'The caretaker alone in an endless white room. Walk, jump, talk, strafe and crouch.',
+  },
 ]
 
 export default function Landing() {
@@ -20,7 +32,7 @@ export default function Landing() {
     <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-black px-4 py-12 font-mono text-[#d8d2c4]">
       {/* CRT scanlines over the whole page */}
       <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(to_bottom,rgba(255,255,255,0.025)_0_1px,transparent_1px_3px)]" />
-      <div className="relative w-full max-w-3xl">
+      <div className="relative w-full max-w-3xl lg:max-w-5xl">
         {/* Same art as public/logo.png at a fraction of the weight; `npm run icons` redraws both. */}
         <img src="/logo.svg" alt="" width={144} height={144} className="mb-6 -ml-2 size-28 sm:size-36" />
         <p className="text-xs tracking-[0.3em] text-[#8a877e] uppercase">Sleeper ship // caretaker terminal</p>
@@ -29,7 +41,7 @@ export default function Landing() {
         </h1>
         <p className="mt-4 max-w-xl text-sm leading-relaxed text-[#8a877e]">Select a scene.</p>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {SCENES.map((scene) => (
             <Link
               key={scene.to}

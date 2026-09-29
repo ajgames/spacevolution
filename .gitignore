@@ -25,3 +25,10 @@ dist-ssr
 
 # Copied from blender/export by scripts/sync-ship.ts
 public/ship
+
+# CC0 source assets for the character build (scripts/build_character.py downloads them)
+blender/assets/
+blender/screenshots/characters/frames/
+
+# Copied from blender/export/characters by scripts/sync-ship.ts
+public/characters
