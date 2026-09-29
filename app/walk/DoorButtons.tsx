@@ -42,16 +42,7 @@ export default function DoorButtons() {
     }
   }, [buttons])
 
-  useFrame(() => {
-    const now = performance.now()
-    buttons.forEach((button, i) => {
-      const since = now - (buttonsPressedAt[button.name] ?? -Infinity)
-      const flash = since < FLASH_MS ? 1 - since / FLASH_MS : 0
-      button.material.opacity = flash * 0.9
-      // Hidden between presses; kept mounted so its shader is built at load.
-      meshes.current[i]!.visible = flash > 0
-    })
-  })
+  useFrame(() => flash(buttons, meshes.current))
 
   return (
     <>
@@ -70,4 +61,16 @@ export default function DoorButtons() {
       ))}
     </>
   )
+}
+
+// Each pressed button glows and fades, and is hidden between presses (the
+// start-up warm-up compiles hidden objects too).
+function flash(buttons: { name: string; material: MeshBasicMaterial }[], meshes: (Mesh | null)[]) {
+  const now = performance.now()
+  buttons.forEach((button, i) => {
+    const since = now - (buttonsPressedAt[button.name] ?? -Infinity)
+    const glow = since < FLASH_MS ? 1 - since / FLASH_MS : 0
+    button.material.opacity = glow * 0.9
+    if (meshes[i]) meshes[i].visible = glow > 0
+  })
 }

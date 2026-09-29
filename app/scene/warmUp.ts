@@ -32,10 +32,20 @@ export function uploadTextures(gl: WebGLRenderer, root: Object3D, extra: Texture
 // Resolves once the GPU driver has finished, compiling in parallel where the
 // browser supports it.
 export function compileShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, target: WebGLRenderTarget | null = null) {
+  // three.js only compiles what's visible, so hidden objects are shown for the
+  // call. compileAsync collects its materials before it returns (the promise
+  // only waits on the driver), and no frame draws in between.
+  const hidden: Object3D[] = []
+  scene.traverse((object) => {
+    if (object.visible) return
+    hidden.push(object)
+    object.visible = true
+  })
   const previous = gl.getRenderTarget()
   gl.setRenderTarget(target)
   const done = gl.compileAsync(scene, camera)
   gl.setRenderTarget(previous)
+  for (const object of hidden) object.visible = false
   return done
 }
 
